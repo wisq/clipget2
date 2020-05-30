@@ -53,12 +53,12 @@ defmodule Clipget.Server do
     Port.close(port)
     status("found #{byte_size(data)} bytes.\n")
 
-    if data == state.put_data do
+    if strip(data) == strip(state.put_data) do
       status("Data matches.  Clearing clipboard ... ")
       put_clipboard("", state)
       status("done.\n")
     else
-      status("Data has changed, not clearing clipboard.")
+      status("Data has changed, not clearing clipboard.\n")
     end
 
     {:noreply, %State{state | put_data: nil, get_data: nil, get_port: nil}}
@@ -97,5 +97,11 @@ defmodule Clipget.Server do
     else
       nil
     end
+  end
+
+  defp strip(str) do
+    str
+    |> String.replace("\r", "")
+    |> String.trim()
   end
 end
