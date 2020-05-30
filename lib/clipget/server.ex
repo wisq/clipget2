@@ -6,10 +6,10 @@ defmodule Clipget.Server do
   @timeout 30_000
 
   defmodule State do
-    @enforce_keys [:put_executable, :get_executable]
+    @enforce_keys [:put_command, :get_command]
     defstruct(
-      put_executable: nil,
-      get_executable: nil,
+      put_command: nil,
+      get_command: nil,
       put_data: nil,
       get_data: nil,
       get_port: nil
@@ -26,9 +26,9 @@ defmodule Clipget.Server do
 
   @impl true
   def init(nil) do
-    {put, get} = detect_executables()
+    {put, get} = detect_commands()
     status("Server started.\n")
-    {:ok, %State{put_executable: put, get_executable: get}}
+    {:ok, %State{put_command: put, get_command: get}}
   end
 
   @impl true
@@ -40,7 +40,7 @@ defmodule Clipget.Server do
   end
 
   defp put_clipboard(data, state) do
-    port = Port.open({:spawn_executable, state.put_executable}, [:binary])
+    port = Port.open({:spawn, state.put_command}, [:binary])
     true = Port.command(port, data)
     true = Port.close(port)
   end
@@ -48,7 +48,7 @@ defmodule Clipget.Server do
   @impl true
   def handle_info(:timeout, state) do
     status("Checking clipboard ... ")
-    port = Port.open({:spawn_executable, state.get_executable}, [:binary, :eof])
+    port = Port.open({:spawn, state.get_command}, [:binary, :eof])
     data = receive_all(port)
     Port.close(port)
     status("found #{byte_size(data)} bytes.\n")
@@ -75,19 +75,27 @@ defmodule Clipget.Server do
     IO.write(:stdio, text)
   end
 
-  @executables [
-    ["/usr/bin/pbcopy", "/usr/bin/pbpaste"],
-    ["/mnt/c/Windows/System32/clip.exe", "/mnt/c/Windows/System32/paste.exe"]
+  @commands [
+    {:MacOS, ["pbcopy", "pbpaste"], ["", ""]},
+    {:WSL, ["clip.exe", "powershell.exe"], ["", " -command Get-Clipboard"]}
   ]
 
-  defp detect_executables do
-    case @executables |> Enum.find(&all_exist?/1) do
-      [put, get] -> {put, get}
+  defp detect_commands do
+    case @commands |> Enum.find_value(&find_commands/1) do
+      {put, get} -> {put, get}
       nil -> raise "Cannot detect executables for reading and writing to clipboard"
     end
   end
 
-  defp all_exist?(list) do
-    list |> Enum.all?(fn exec -> File.exists?(exec) end)
+  defp find_commands({os, [put_base, get_base], [put_args, get_args]}) do
+    put_exec = System.find_executable(put_base)
+    get_exec = System.find_executable(get_base)
+
+    if put_exec && get_exec do
+      status("Using #{os} executables: #{put_exec}, #{get_exec}\n")
+      {put_exec <> put_args, get_exec <> get_args}
+    else
+      nil
+    end
   end
 end
