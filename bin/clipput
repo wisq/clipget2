@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec elixir --sname clipput-"$$" -S mix run bin/clipput.exs

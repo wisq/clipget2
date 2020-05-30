@@ -1,18 +1,23 @@
 defmodule Clipget do
-  @moduledoc """
-  Documentation for `Clipget`.
-  """
+  use Application
 
-  @doc """
-  Hello world.
+  @impl true
+  def start(_type, _args) do
+    opts = [strategy: :rest_for_one, name: Clipget.Supervisor]
+    Supervisor.start_link(child_list(), opts)
+  end
 
-  ## Examples
+  defp child_list do
+    if server?() do
+      [Clipget.Server]
+    else
+      []
+    end
+  end
 
-      iex> Clipget.hello()
-      :world
-
-  """
-  def hello do
-    :world
+  defp server? do
+    node()
+    |> Atom.to_string()
+    |> String.starts_with?("clipget@")
   end
 end
